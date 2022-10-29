@@ -110,7 +110,7 @@ impl InfoApp {
         self.weather.render(ctx);
     }
 
-    fn render_news(&self, ctx: &Context) {
+    fn render_news(&mut self, ctx: &Context) {
         self.news.render(ctx);
     }
 
