@@ -1,4 +1,4 @@
-use eframe::egui::{Align, CentralPanel, Context, Layout, ScrollArea, Separator, Ui};
+use eframe::{egui::{Align, CentralPanel, Context, Layout, ScrollArea, Separator, Ui, Hyperlink}};
 use rss::{Channel,Item};
 use std::{
     error::Error, io::BufReader,
@@ -38,7 +38,7 @@ impl News {
                 let refresh_button = ui.button("Refresh");
                 if refresh_button.clicked() {
                     if self.rss_url.is_empty() {
-                        ui.label("RSS url is not specified");
+                        ui.label("RSS url is not specified");   // TODO input for rss url
                     } else {
                         self.get_items();
                     }
@@ -50,9 +50,18 @@ impl News {
     fn render_items(&self, ui: &mut Ui) {
         ScrollArea::vertical().show(ui, |ui| {
             for item in &self.items {
-                ui.label(item.title().unwrap_or("No title"));
-                ui.add_space(1.0);
-                ui.add(Separator::default().horizontal());
+                ui.horizontal(|ui| {
+                    // TODO: add image
+                    ui.vertical(|ui| {
+                        ui.label(item.title().unwrap_or("No title"));
+                        ui.label(item.description().unwrap_or("No description"));
+                        ui.with_layout(Layout::right_to_left(Align::LEFT), |ui| {
+                            ui.add(Hyperlink::from_label_and_url("read more ⤴", item.link().unwrap_or("No Link")));
+                        });
+                        ui.add_space(1.0);
+                        ui.add(Separator::default().horizontal());
+                    })
+                });
             }
         });
     }
