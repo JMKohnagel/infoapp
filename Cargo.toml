@@ -7,5 +7,8 @@ edition = "2021"
 
 [dependencies]
 eframe = "0.19.0"
+egui_extras = {version="0.19.0", features=["image"]}
+image = "0.24.4"
+regex = "1.6.0"
+reqwest = { version = "0.11.12", features = ["blocking"] }
 rss = "2.0.1"
-ureq = "2.5.0"
