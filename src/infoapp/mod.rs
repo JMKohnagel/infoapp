@@ -94,31 +94,11 @@ impl InfoApp {
 
     pub(crate) fn render_current_page(&mut self, ctx: &Context) {
         match self.current_page {
-            PageType::Main => self.render_main(ctx),
-            PageType::Weather => self.render_weather(ctx),
-            PageType::News => self.render_news(ctx),
-            PageType::ToDo => self.render_todo(ctx),
-            PageType::Settings => self.render_settings(ctx),
+            PageType::Main => self.main.render(ctx),
+            PageType::Weather => self.weather.render(ctx),
+            PageType::News => self.news.render(ctx),
+            PageType::ToDo => self.todo.render(ctx),
+            PageType::Settings => self.settings.render(ctx),
         }
-    }
-
-    fn render_main(&self, ctx: &Context) {
-        self.main.render(ctx);
-    }
-
-    fn render_weather(&self, ctx: &Context) {
-        self.weather.render(ctx);
-    }
-
-    fn render_news(&mut self, ctx: &Context) {
-        self.news.render(ctx);
-    }
-
-    fn render_todo(&self, ctx: &Context) {
-        self.todo.render(ctx);
-    }
-
-    fn render_settings(&mut self, ctx: &Context) {
-        self.settings.render(ctx);
     }
 }
