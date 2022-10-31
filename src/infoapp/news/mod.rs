@@ -1,5 +1,5 @@
 use eframe::egui::{
-    Align, CentralPanel, ColorImage, Context, Hyperlink, Layout, ScrollArea, Separator, Ui,
+    Align, CentralPanel, ColorImage, Context, Hyperlink, Layout, ScrollArea, Separator, Ui, RichText,
 };
 use egui_extras::RetainedImage;
 use rss::Channel;
@@ -12,7 +12,7 @@ use std::{
 };
 
 const RSS_URL: &str = "https://www.tagesschau.de/xml/rss2/";
-const DEFAULT_IMAGE_PATH: &str = "assets/loading.jpg";
+const LOADING_IMAGE_PATH: &str = "assets/loading.jpg";
 
 struct ImgPos {
     pos: usize,
@@ -137,7 +137,8 @@ impl News {
                 ui.horizontal(|ui| {
                     ui.image(item.image.texture_id(ctx), item.image.size_vec2());
                     ui.vertical(|ui| {
-                        ui.label(&item.title);
+                        ui.label(RichText::new(&item.title).size(25.0).strong());
+                        ui.add_space(2.0);
                         ui.label(&item.description);
                         ui.with_layout(Layout::right_to_left(Align::BOTTOM), |ui| {
                             ui.add(Hyperlink::from_label_and_url("read more ⤴", &item.link));
@@ -198,7 +199,7 @@ fn get_items(rss_url: String, news_tx: Sender<Vec<NewsItem>>) {
             title: item.title().unwrap_or("").to_string(),
             link: item.link().unwrap_or("").to_string(),
             description: item.description().unwrap_or("").to_string(),
-            image: default_image(),
+            image: loading_image(),
             image_url: get_image_url(item.content()),
         };
         news_items.push(item);
@@ -230,15 +231,15 @@ fn get_image_url<'a>(content: Option<&'a str>) -> Option<String> {
     }
 }
 
-fn default_color_image() -> Result<ColorImage, image::ImageError> {
-    let image = image::io::Reader::open(Path::new(DEFAULT_IMAGE_PATH))?.decode()?;
+fn loading_image() -> RetainedImage {
+    let img = color_image(LOADING_IMAGE_PATH).unwrap();
+    RetainedImage::from_color_image("loading_image", img)
+}
+
+fn color_image(path: &str) -> Result<ColorImage, image::ImageError> {
+    let image = image::io::Reader::open(Path::new(path))?.decode()?;
     let size = [image.width() as _, image.height() as _];
     let image_buffer = image.to_rgba8();
     let pixels = image_buffer.as_flat_samples();
     Ok(ColorImage::from_rgba_unmultiplied(size, pixels.as_slice()))
-}
-
-fn default_image() -> RetainedImage {
-    let img = default_color_image().unwrap();
-    RetainedImage::from_color_image("default_image", img)
 }
