@@ -1,5 +1,6 @@
 use eframe::egui::{
-    Align, CentralPanel, ColorImage, Context, Hyperlink, Layout, ScrollArea, Separator, Ui, RichText,
+    Align, CentralPanel, ColorImage, Context, Hyperlink, Layout, RichText, ScrollArea, Separator,
+    Ui,
 };
 use egui_extras::RetainedImage;
 use rss::Channel;
@@ -125,7 +126,11 @@ impl News {
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 let refresh_button = ui.button("Refresh");
                 if refresh_button.clicked() {
-                    self.refresh(ui);
+                    if self.rss_url.is_empty() {
+                        ui.label("RSS url is not specified");
+                    } else {
+                        self.refresh();
+                    }
                 }
             });
         });
@@ -151,20 +156,15 @@ impl News {
         });
     }
 
-    fn refresh(&mut self, ui: &mut Ui) {
-        if self.rss_url.is_empty() {
-            ui.label("RSS url is not specified");
-        } else {
-            self.items = Vec::new();
-            self.image_load_counter = 0;
-            self.rendering = true;
-            let url = self.rss_url.clone();
-            let tx = self.news_tx.clone();
-            std::thread::spawn(move || {
-                get_items(url, tx);
-            });
-            
-        }
+    pub fn refresh(&mut self) {
+        self.items = Vec::new();
+        self.image_load_counter = 0;
+        self.rendering = true;
+        let url = self.rss_url.clone();
+        let tx = self.news_tx.clone();
+        std::thread::spawn(move || {
+            get_items(url, tx);
+        });
     }
 
     // spawn a thread for each item to download the image and send it back to the main thread

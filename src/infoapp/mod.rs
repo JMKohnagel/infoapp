@@ -62,6 +62,7 @@ impl InfoApp {
                         self.current_page = PageType::Weather;
                     }
                     if news_button.clicked() {
+                        self.news.refresh();
                         self.current_page = PageType::News;
                     }
                     if todo_button.clicked() {
@@ -81,7 +82,6 @@ impl InfoApp {
 
     fn configure_textstyles(egui_ctx: &Context) {
         use eframe::epaint::FontFamily::Proportional;
-
         let mut style = (*egui_ctx.style()).clone();
         style.text_styles = [
             (TextStyle::Heading, FontId::new(35.0, Proportional)),
