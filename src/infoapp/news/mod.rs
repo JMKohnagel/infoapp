@@ -120,7 +120,7 @@ impl News {
     fn render_top_bar(&mut self, ui: &mut Ui) {
         ui.horizontal(|ui| {
             ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                ui.heading("News");
+                ui.heading(RichText::new("News").strong());
             });
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 let refresh_button = ui.button("Refresh");
