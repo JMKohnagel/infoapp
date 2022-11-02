@@ -26,7 +26,7 @@ struct NewsItem {
     pub link: String,
     pub description: String,
     pub image: RetainedImage,
-    pub image_url: Option<String>,
+    pub image_updated: bool,
 }
 
 impl Ord for NewsItem {
@@ -66,24 +66,24 @@ pub struct News {
     rss_url: String,
     rendering: bool,
     items: Vec<NewsItem>,
-    news_rx: Receiver<Vec<NewsItem>>,
-    news_tx: Sender<Vec<NewsItem>>,
+    item_rx: Receiver<NewsItem>,
+    item_tx: Sender<NewsItem>,
     image_rx: Receiver<Option<ImgPos>>,
     image_tx: Sender<Option<ImgPos>>,
 }
 
 impl News {
     pub fn new() -> Self {
-        let (news_tx, news_rx) = std::sync::mpsc::channel();
         let (image_tx, image_rx) = std::sync::mpsc::channel();
+        let (item_tx, item_rx) = std::sync::mpsc::channel();
         News {
             item_count: 0,
             image_load_counter: 0,
             rss_url: RSS_URL.to_string(),
             rendering: false,
             items: Vec::new(),
-            news_rx,
-            news_tx,
+            item_rx,
+            item_tx,
             image_rx,
             image_tx,
         }
@@ -96,20 +96,18 @@ impl News {
             ui.add(Separator::default().horizontal());
             self.render_items(ui, ctx);
             if self.rendering {
-                if self.items.is_empty() {
-                    ui.label("Loading...");
-                    if let Ok(items) = self.news_rx.try_recv() {
-                        self.items = items;
-                        self.item_count = self.items.len();
-                        self.update_images();
-                    }
+                ui.label("Loading...");
+                if let Ok(item) = self.item_rx.try_recv() {
+                    self.insert_item(item);
+                    self.item_count += 1;
                 }
-                if self.image_load_counter < self.item_count || self.image_load_counter == 0 {
+                if self.image_load_counter < self.item_count {
                     if let Ok(img_pos) = self.image_rx.try_recv() {
                         if let Some(img_pos) = img_pos {
-                            self.items[img_pos.pos].image = img_pos.image;
+                            self.try_update_image(img_pos);
+                        } else {
+                            self.image_load_counter += 1;
                         }
-                        self.image_load_counter += 1;
                     }
                 } else {
                     self.rendering = false;
@@ -161,23 +159,54 @@ impl News {
         self.image_load_counter = 0;
         self.rendering = true;
         let url = self.rss_url.clone();
-        let tx = self.news_tx.clone();
+        let item_tx = self.item_tx.clone();
+        let image_tx = self.image_tx.clone();
         std::thread::spawn(move || {
-            get_items(url, tx);
+            get_items(url, item_tx, image_tx);
         });
     }
 
-    // spawn a thread for each item to download the image and send it back to the main thread
-    fn update_images(&self) {
-        for item in &self.items {
-            let tx = self.image_tx.clone();
-            let image_url = item.image_url.clone();
-            let item_pos = item.position.clone();
-            std::thread::spawn(move || {
-                get_image(image_url, item_pos, tx);
-            });
+    // function to sorted insert item in list
+    fn insert_item(&mut self, item: NewsItem) {
+        let pos = self.items.binary_search_by(|i| i.position.cmp(&item.position));
+        match pos {
+            Ok(_) => (),
+            Err(pos) => self.items.insert(pos, item),
         }
     }
+
+    fn try_update_image(&mut self, img_pos: ImgPos) {
+        if self.is_item_in_list(img_pos.pos) {
+            self.update_image(img_pos);
+        } else {
+            self.image_tx.send(Some(img_pos)).unwrap();
+        }
+    }
+
+    fn is_item_in_list(&self, pos: usize) -> bool {
+        let mut result = false;
+        self.items.iter().for_each(|item| {
+            if item.position == pos {
+                result = true;
+                return;
+            }
+        });
+        result
+    }
+
+    fn update_image(&mut self, img_pos: ImgPos) {
+        let mut index = 0;
+        self.items.iter().enumerate().for_each(|(i, item)| {
+            if item.position == img_pos.pos {
+                index = i;
+                return;
+            }
+        });
+        self.items[index].image = img_pos.image;
+        self.items[index].image_updated = true;
+        self.image_load_counter += 1;
+    }
+
 }
 
 fn get_channel(rss_url: String) -> Result<Channel, Box<dyn Error>> {
@@ -186,25 +215,29 @@ fn get_channel(rss_url: String) -> Result<Channel, Box<dyn Error>> {
     Ok(channel)
 }
 
-fn get_items(rss_url: String, news_tx: Sender<Vec<NewsItem>>) {
+fn get_items(rss_url: String, item_tx: Sender<NewsItem>, image_tx: Sender<Option<ImgPos>>) {
     let channel = get_channel(rss_url);
     let items = match channel {
         Ok(c) => c.into_items().to_vec(),
         Err(_) => Vec::new(),
     };
-    let mut news_items = Vec::new();
     items.iter().enumerate().for_each(|(i, item)| {
-        let item = NewsItem {
-            position: i,
-            title: item.title().unwrap_or("").to_string(),
-            link: item.link().unwrap_or("").to_string(),
-            description: item.description().unwrap_or("").to_string(),
-            image: loading_image(),
-            image_url: get_image_url(item.content()),
-        };
-        news_items.push(item);
+        let tx = item_tx.clone();
+        let img_tx = image_tx.clone();
+        let it = item.clone();
+        std::thread::spawn(move || {
+            let news_item = NewsItem {
+                position: i,
+                title: it.title().unwrap_or("").to_string(),
+                link: it.link().unwrap_or("").to_string(),
+                description: it.description().unwrap_or("").to_string(),
+                image: loading_image(),
+                image_updated: false,
+            };
+            tx.send(news_item).unwrap();
+            get_image(get_image_url(it.content()), i, img_tx);
+        });
     });
-    news_tx.send(news_items).unwrap();
 }
 
 fn get_image(url: Option<String>, pos: usize, image_tx: Sender<Option<ImgPos>>) {
