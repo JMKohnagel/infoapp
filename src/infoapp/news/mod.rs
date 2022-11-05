@@ -11,9 +11,12 @@ use std::{
     path::Path,
     sync::mpsc::{Receiver, Sender},
 };
+use threadpool::ThreadPool;
 
 const RSS_URL: &str = "https://www.tagesschau.de/xml/rss2/";
 const LOADING_IMAGE_PATH: &str = "assets/loading.jpg";
+
+const MAX_THREAD_NUMBER: usize = 20;
 
 struct ImgPos {
     pos: usize,
@@ -101,7 +104,7 @@ impl News {
                     self.insert_item(item);
                     self.item_count += 1;
                 }
-                if self.image_load_counter < self.item_count {
+                if self.image_load_counter < self.item_count || self.item_count == 0 {
                     if let Ok(img_pos) = self.image_rx.try_recv() {
                         if let Some(img_pos) = img_pos {
                             self.try_update_image(img_pos);
@@ -156,6 +159,7 @@ impl News {
 
     pub fn refresh(&mut self) {
         self.items = Vec::new();
+        self.item_count = 0;
         self.image_load_counter = 0;
         self.rendering = true;
         let url = self.rss_url.clone();
@@ -221,11 +225,12 @@ fn get_items(rss_url: String, item_tx: Sender<NewsItem>, image_tx: Sender<Option
         Ok(c) => c.into_items().to_vec(),
         Err(_) => Vec::new(),
     };
+    let threadpool = ThreadPool::new(MAX_THREAD_NUMBER);
     items.iter().enumerate().for_each(|(i, item)| {
         let tx = item_tx.clone();
         let img_tx = image_tx.clone();
         let it = item.clone();
-        std::thread::spawn(move || {
+        threadpool.execute(move || {
             let news_item = NewsItem {
                 position: i,
                 title: it.title().unwrap_or("").to_string(),

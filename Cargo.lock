@@ -1160,6 +1160,7 @@ dependencies = [
  "regex",
  "reqwest",
  "rss",
+ "threadpool",
 ]
 
 [[package]]
