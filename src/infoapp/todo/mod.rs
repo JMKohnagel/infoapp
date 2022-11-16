@@ -37,7 +37,7 @@ impl Todo {
         let (items, last_id) = load_items();
         Todo {
             items,
-            next_id: last_id + 1,
+            next_id: last_id,
             filter_value: String::new(),
         }
     }
@@ -68,10 +68,7 @@ impl Todo {
             ui.horizontal(|ui| {
                 let checkbox = ui.checkbox(&mut self_item.done, "");
                 let input = ui.text_edit_singleline(&mut self_item.text);
-                if input.lost_focus() && !self_item.text.is_empty() {
-                    save = true;
-                }
-                if checkbox.clicked() && !self_item.text.is_empty() {
+                if input.changed() || checkbox.clicked() {
                     save = true;
                 }
                 if ui.button("x").on_hover_text("Delete").clicked() {
@@ -116,19 +113,30 @@ fn load_items() -> (Vec<TodoItem>, usize) {
     let file = fs::read_to_string(format!("{}/{}.todo", STORE_PATH, LIST_NAME))
         .expect("Unable to open file");
     let mut last = "0::f";
-    for line in file.lines() {
-        last = line;
-        let parts: Vec<&str> = line.split("::").collect();
-        let id = parts[0].parse::<usize>().unwrap();
-        let done = parts[1].parse::<bool>().unwrap();
-        let text = parts[2].to_string();
+    file.lines().enumerate().for_each(|(i, line)| {
+        let mut split = line.split("::");
+        split.next();
+        let id = i;
+        let done = split.next().unwrap().parse::<bool>().unwrap();
+        let text = split.next().unwrap().to_string();
         items.push(TodoItem::new(id, text, done));
-    }
+        last = line;
+    });
+    // for line in file.lines() {
+    //     last = line;
+    //     let parts: Vec<&str> = line.split("::").collect();
+    //     let id = parts[0].parse::<usize>().unwrap();
+    //     let done = parts[1].parse::<bool>().unwrap();
+    //     let text = parts[2].to_string();
+    //     items.push(TodoItem::new(id, text, done));
+    // }
+    let len = items.len();
     return (
         items,
-        last.split("::").collect::<Vec<&str>>()[0]
-            .parse::<usize>()
-            .unwrap(),
+        len
+        // last.split("::").collect::<Vec<&str>>()[0]
+        //     .parse::<usize>()
+        //     .unwrap(),
     );
 }
 
@@ -142,6 +150,9 @@ fn save_items(items: &Vec<TodoItem>) {
             .open(format!("{}/{}.todo", STORE_PATH, LIST_NAME))
             .expect("Unable to open file");
         for item in itemss {
+            if item.text.is_empty() {
+                continue;
+            }
             writeln!(file, "{}::{}::{}", item.id, item.done, item.text).expect("Unable to write file");
         }
     });
